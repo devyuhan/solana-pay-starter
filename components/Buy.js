@@ -1,16 +1,25 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Keypair, Transaction } from "@solana/web3.js";
+import { findReference, FindReferenceError } from "@solana/pay";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { InfinitySpin } from "react-loader-spinner";
 import IPFSDownload from "./IpfsDownload";
+import { addOrder } from '../lib/api';
+
+const STATUS = {
+    Initial: "Initial",
+    Submitted: "Submitted",
+    Paid: "Paid",
+  };
 
 export default function Buy({ itemID }) {
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
   const orderID = useMemo(() => Keypair.generate().publicKey, []); // Public key used to identify the order
 
-  const [paid, setPaid] = useState(null);
   const [loading, setLoading] = useState(false); // Loading state of all above
+  const [status, setStatus] = useState(STATUS.Initial); // Tracking transaction status
+
   
   // useMemo is a React hook that only computes the value if the dependencies change
   const order = useMemo(
@@ -43,14 +52,43 @@ export default function Buy({ itemID }) {
       // Send the transaction to the network
       const txHash = await sendTransaction(tx, connection);
       console.log(`Transaction sent: https://solscan.io/tx/${txHash}?cluster=devnet`);
-      // Even though this could fail, we're just going to set it to true for now
-      setPaid(true);
+      setStatus(STATUS.Submitted);
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Check if transaction was confirmed
+    if (status === STATUS.Submitted) {
+      setLoading(true);
+      const interval = setInterval(async () => {
+        try {
+          const result = await findReference(connection, orderID);
+          console.log("Finding tx reference", result.confirmationStatus);
+          if (result.confirmationStatus === "confirmed" || result.confirmationStatus === "finalized") {
+            clearInterval(interval);
+            setStatus(STATUS.Paid);
+            setLoading(false);
+            addOrder(order);
+            alert("Thank you for your purchase!");
+          }
+        } catch (e) {
+          if (e instanceof FindReferenceError) {
+            return null;
+          }
+          console.error("Unknown error", e);
+        } finally {
+          setLoading(false);
+        }
+      }, 1000);
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [status]);
 
   if (!publicKey) {
     return (
@@ -66,7 +104,7 @@ export default function Buy({ itemID }) {
 
   return (
     <div>
-      {paid ? (
+      {status === STATUS.Paid ? (
         <IPFSDownload filename="t-shirts.zip" hash="QmQCTjBgLfhZ3uDRLL8aPLEHFaDn5i6Gx7SczigwQx9bKU" cta="Download t-shirts"/>
       ) : (
         <button disabled={loading} className="buy-button" onClick={processTransaction}>
