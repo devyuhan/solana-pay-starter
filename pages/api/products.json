@@ -1,0 +1,11 @@
+[
+    {
+      "id": 1,
+      "name": "T-shirts",
+      "price": "60",
+      "description": "Cute T-shirts",
+      "image_url": "https://img.ltwebstatic.com/images3_pi/2021/05/25/16219317936e1b5763318daee14c09ca4551e4859e_thumbnail_600x.webp",
+      "filename": "t-shirts.zip",
+      "hash": "QmQCTjBgLfhZ3uDRLL8aPLEHFaDn5i6Gx7SczigwQx9bKU"
+    }
+  ]
